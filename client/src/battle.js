@@ -1,5 +1,6 @@
 import { Context } from './tools/context.js';
 import { sleep } from './tools/time.js';
+import { mspace } from './tools/mspace.js';
 
 const states = {
     verbs: async ctx => {
@@ -11,16 +12,17 @@ const states = {
 	const entities = I.map(i => null);
 	const players = external.player.both();
 	const meta  = {turn: 1, actions: 3, select: null};
-	const wallets = [3, 3];
-	
+	const wallets = [5, 5];
+
 	const verbs = {
 	    board: {
-		// ...external.board,
 		create: () => external.board.create(),
 		select: (...row_col) => {
 		    meta.select = row_col[0] == null ? null : row_col;
 		    external.board.select(...row_col);
 		},
+		selected: () => meta.select,
+		contains: (row, col) => row >= 0 && col >= 0 && row < nrows && col < ncols,
 	    },
 	    wallet: {
 		create: async () => {
@@ -45,10 +47,10 @@ const states = {
 		    await external.entity.destroy(row, col);
 		},
 		move: async (p0, p1) => {
-		    const [i0, i1] = [p0, p1].map(([row, col]) => row*ncols + col);		    
+		    const [i0, i1] = [p0, p1].map(([row, col]) => row*ncols + col);
 		    [entities[i0], entities[i1]] = [null, entities[i0]];
 		    await external.entity.move(p0, p1);
-		},		
+		},
 		jump: () => {
 		    entities.forEach((entity, _, i) => {
 			if (entity !== ['gnome-red', 'gnome-blue'][meta.turn]) { return; }
@@ -56,33 +58,19 @@ const states = {
 			verbs.entity.move([row, col], [row, col]);
 		    });
 		},
+		get: (row, col) => entities[row*ncols + col],
+		current: () => ['gnome-red', 'gnome-blue'][meta.turn],
 	    },
 	    player: {
-		select: async () => {
-		    const target = ['gnome-red', 'gnome-blue'][meta.turn];
-		    const filter = (row, col) => entities[row*ncols + col] === target;
-		    const choice = await players[meta.turn].choice(filter);
-		    return choice;
-		},
-		act: async (dist, options={}, prices=[]) => {
-		    const close = (row, col) => {
-			const [p0, p1] = [meta.select, [row, col]];
-			const d = Math.max(Math.abs(p0[0] - p1[0]), Math.abs(p0[1] - p1[1]));
-			return d <= dist;
-		    };
-		    const empty = (row, col) => !entities[row*ncols + col];
-		    const filter = (row, col) => close(row, col) && empty(row, col);
+		choice: async (filter, options, prices) => {
 		    const choice = await players[meta.turn].choice(filter, options, prices);
 		    return choice;
 		},
 		step: async (row, col) => {
-		    const selected = verbs.selected(); verbs.board.select();
+		    const selected = verbs.board.selected(); verbs.board.select();
 		    await verbs.entity.move(selected, [row, col]);
 		    verbs.board.select(row, col);
 		    meta.actions -= 1;
-		},
-		money: async amount => {
-		    wallets[meta.turn] += amount;
 		},
 	    },
 	    pass: () => {
@@ -90,129 +78,214 @@ const states = {
 		meta.turn = 1 - meta.turn;
 		verbs.board.select();
 	    },
-	    selected: () => meta.select,
 	    actions: () => meta.actions,
 	    turn: () => meta.turn,
-	};	
+	};
 	Object.assign(ctx, {verbs, nrows, ncols});
 	return 'create';
     },
     create: async ctx => {
 	const {verbs, nrows, ncols} = ctx;
-	
+
 	const [row, col] = [Math.floor((nrows-1)/2), Math.floor((ncols-1)/2)];
-	await verbs.board.create();	
+	await verbs.board.create();
+
+	//verbs.entity.create(1, 1, 'flower');
+	//verbs.entity.create(nrows-2, 1, 'flower');
+	//verbs.entity.create(1, ncols-2, 'flower');
+	//await verbs.entity.create(nrows-2, ncols-2, 'flower');
+	//verbs.entity.create(row, col, 'flower');
+	
+	verbs.entity.create(row-1, col-1, 'gnome-red');
 	verbs.entity.create(row+1, col-1, 'gnome-red');
-	verbs.entity.create(row+1, col+1, 'gnome-red');
-	verbs.entity.create(row-1, col-1, 'gnome-blue');
-	await verbs.entity.create(row-1, col+1, 'gnome-blue');
+	verbs.entity.create(row-1, col+1, 'gnome-blue');
+	await verbs.entity.create(row+1, col+1, 'gnome-blue');	
 
 	await verbs.wallet.create();
-	//verbs.wallet.get(0).update(10);
-	//await verbs.wallet.get(1).update(69);
-	
+
 	return 'pass';
     },
     select: async ctx => {
 	const {verbs} = ctx;
 
-	const [row, col] = await verbs.player.select();
+	const filter = mspace(
+	    ([row, col]) => verbs.entity.get(row, col),
+	    (a, b) => Math.max(Math.abs(a[0] - b[0]), Math.abs(a[1] - b[1])),
+	    (a, b) => (a !== b)*1)
+	      .wrt(1, verbs.entity.current()).only(1, d => d === 0).spread();
+	const options = {};
+	const choice = await verbs.player.choice(filter, options);
+	const [row, col] = choice;
 	verbs.board.select(row, col);
-	
+
 	return 'loop';
     },
     step: async ctx => {
 	const {verbs} = ctx;
-	
-	const choice = await verbs.player.act(1, {cancel: 'cancel'});
+
+	const filter = mspace(
+	     ([row, col]) => verbs.entity.get(row, col),
+	     (a, b) => Math.max(Math.abs(a[0] - b[0]), Math.abs(a[1] - b[1])),
+	     (a, b) => (a !== b)*1)
+	       .wrt(0, verbs.board.selected()).only(0, d => d === 1)
+	       .wrt(1, null).only(1, d => d === 0).spread();
+	const options = {cancel: 'cancel'};
+	const choice = await verbs.player.choice(filter, options);
 	if (choice === 'cancel') { verbs.board.select(); return 'loop'; }
-	
-	const [row, col] = choice; const prev = verbs.selected();
+
+	const [row, col] = choice; const prev = verbs.board.selected();
 	await verbs.player.step(row, col);
 	verbs.entity.create(...prev, 'flower');
-	
+
 	return 'loop';
     },
     act: async ctx => {
 	const {verbs} = ctx;
-	
-	const choice = await verbs.player.act(1, {
-	    shop: 'shop',
-	    plant: 'plant',
-	    jump: 'jump',
-	    pass: 'stop',
-	});
 
-	if (typeof choice === 'string') { return choice; }	
-	
+	 const filter = mspace(
+	     ([row, col]) => verbs.entity.get(row, col),
+	     (a, b) => Math.max(Math.abs(a[0] - b[0]), Math.abs(a[1] - b[1])),
+	     (a, b) => (a !== b)*1)
+	       .wrt(0, verbs.board.selected()).only(0, d => d === 1)
+	       .wrt(1, null).only(1, d => d === 0).spread();
+	const options = {plant: 'plant', jump: 'jump', kick: 'kick', shop: 'shop', pass: 'stop'};
+	const choice = await verbs.player.choice(filter, options);
+
+	const __HIDE__ = async () => {
+	    const choice = await verbs.player.act(1, {
+		shop: 'shop',
+		plant: 'plant',
+		jump: 'jump',
+		pass: 'stop',
+	    });
+	};
+
+	if (typeof choice === 'string') { return choice; }
+
 	const [row, col] = choice;
 	await verbs.player.step(row, col);
-	
+
 	return 'loop';
     },
     loop: async ctx => {
 	const {verbs} = ctx;
 
 	const actions = verbs.actions();
-	const selected = verbs.selected();
-	
+	const selected = verbs.board.selected();
+
 	if (actions <= 0) { return 'pass'; }
 	if (actions === 3 && !selected) { return 'select'; }
 	if (actions === 3 && selected) { return 'step'; }
-	
+
 	return 'act';
+    },
+    'kick': async ctx => {
+	const {verbs} = ctx;
+
+	const filter = mspace(
+	    ([row, col]) => verbs.entity.get(row, col),
+	    (a, b) => Math.max(Math.abs(a[0] - b[0]), Math.abs(a[1] - b[1])),
+	    (a, b) => (a !== b)*1)
+	      .wrt(0, verbs.board.selected()).only(0, d => d === 1)
+	      .wrt(1, 'gnome-red', 'gnome-blue').only(1, d => d === 0).spread();
+	const options = {cancel: 'cancel'};
+	const choice = await verbs.player.choice(filter, options);
+	if (choice === 'cancel') { return 'loop'; }
+
+	const [row, col] = choice;
+	const [row0, col0] = verbs.board.selected();
+	const [delta_r, delta_c] = [row - row0, col - col0];
+	const [row1, col1] = [row + delta_r, col + delta_c];
+
+	if (!verbs.entity.get(row1, col1) && verbs.board.contains(row1, col1)) {	    
+	    verbs.entity.move([row, col], [row1, col1]);
+	    verbs.entity.create(row, col, 'flower');
+	}
+	else {
+	    verbs.entity.move([row, col], [row, col]);
+	}
+
+	return 'pass';
     },
     'jump': async ctx => {
 	const {verbs} = ctx;
-	
-	const choice = await verbs.player.act(2, {cancel: 'cancel'});
+
+	const filter = mspace(
+	    ([row, col]) => verbs.entity.get(row, col),
+	    (a, b) => Math.max(Math.abs(a[0] - b[0]), Math.abs(a[1] - b[1])),
+	    (a, b) => (a !== b)*1)
+	      .wrt(0, verbs.board.selected()).only(0, d => d === 2)
+	      .wrt(1, null).only(1, d => d === 0).spread();
+	const options = {cancel: 'cancel'};
+	const choice = await verbs.player.choice(filter, options);
 	if (choice === 'cancel') { return 'loop'; }
-	
+
 	const [row, col] = choice;
 	await verbs.player.step(row, col);
-	
+
 	return 'pass';
     },
     'plant': async ctx => {
 	const {verbs} = ctx;
-	
-	const choice = await verbs.player.act(2, {cancel: 'cancel'});
+
+	const filter = mspace(
+	    ([row, col]) => verbs.entity.get(row, col),
+	    (a, b) => Math.max(Math.abs(a[0] - b[0]), Math.abs(a[1] - b[1])),
+	    (a, b) => (a !== b)*1)
+	      .wrt(0, verbs.board.selected()).only(0, d => d <= 2)
+	      .wrt(1, null).only(1, d => d === 0).spread();
+	const options = {cancel: 'cancel'};
+	const choice = await verbs.player.choice(filter, options);
 	if (choice === 'cancel') { return 'loop'; }
-	
+
 	const [row, col] = choice;
 	verbs.entity.create(row, col, 'flower');
-	
+
 	return 'pass';
-    },    
+    },
     'spawn': async ctx => {
 	const {verbs} = ctx;
-	
-	const choice = await verbs.player.act(2, {cancel: 'cancel'});
+
+	const filter = mspace(
+	    ([row, col]) => verbs.entity.get(row, col),
+	    (a, b) => Math.max(Math.abs(a[0] - b[0]), Math.abs(a[1] - b[1])),
+	    (a, b) => (a !== b)*1)
+	      .wrt(0, verbs.board.selected()).only(0, d => d <= 2)
+	      .wrt(1, null).only(1, d => d === 0).spread();
+	const options = {cancel: 'cancel'};
+	const choice = await verbs.player.choice(filter, options);
 	if (choice === 'cancel') { return 'loop'; }
-	
+
 	const [row, col] = choice;
 	verbs.entity.create(row, col, ['gnome-red', 'gnome-blue'][verbs.turn()]);
 
 	await verbs.wallet.add(-1);
-	
+
 	return 'pass';
     },
     'pass': async ctx => {
 	const {verbs} = ctx;
 
 	verbs.pass(); // verbs.entity.jump();
-	
+
 	return 'loop';
     },
     'bombard': async ctx => {
 	const {verbs} = ctx;
-	
-	const choice = await verbs.player.act(2, {cancel: 'cancel'});
+
+	const filter = mspace(
+	    ([row, col]) => verbs.entity.get(row, col),
+	    (a, b) => Math.max(Math.abs(a[0] - b[0]), Math.abs(a[1] - b[1])),
+	    (a, b) => (a !== b)*1)
+	      .wrt(0, verbs.board.selected()).only(0, d => d <= 2)
+	      .wrt(1, null).only(1, d => d === 0).spread();
+	const options = {cancel: 'cancel'};
+	const choice = await verbs.player.choice(filter, options);
 	if (choice === 'cancel') { return 'loop'; }
-	
+
 	const [row, col] = choice;
 	await verbs.entity.create(row, col, 'bomb');
-	
+
 	const pts = [
 	    [0, 0],
 	    [-1, -1],
@@ -230,17 +303,109 @@ const states = {
 	));
 
 	await verbs.wallet.add(-1);
-	
+
+	return 'pass';
+    },
+    'plant3': async ctx => {
+	const {verbs} = ctx;
+
+	for (let i = 0; i < 3; i++) {
+	    const filter = mspace(
+		([row, col]) => verbs.entity.get(row, col),
+		(a, b) => Math.max(Math.abs(a[0] - b[0]), Math.abs(a[1] - b[1])),
+		(a, b) => (a !== b)*1)
+		  .wrt(0, verbs.board.selected()).only(0, d => d <= 2)
+		  .wrt(1, null).only(1, d => d === 0).spread();
+	    const options = i ? {pass: 'stop'} : {cancel: 'cancel'};
+	    const choice = await verbs.player.choice(filter, options);
+	    
+	    if (choice === 'cancel') { return 'shop'; }
+	    if (choice === 'pass') { break; }
+	    
+	    const [row, col] = choice;
+	    verbs.entity.create(row, col, 'flower');	    	    
+	}
+
+	await verbs.wallet.add(-1);
+
+	return 'pass';
+    },
+    'wizard': async ctx => {
+	const {verbs} = ctx;
+
+	const filter = mspace(
+	    ([row, col]) => verbs.entity.get(row, col),
+	    (a, b) => Math.max(Math.abs(a[0] - b[0]), Math.abs(a[1] - b[1])),
+	    (a, b) => (a !== b)*1)
+	      .wrt(0, verbs.board.selected()).only(0, d => d <= 2)
+	      .wrt(1, null).only(1, d => d === 0).spread();
+	const options = {cancel: 'cancel'};
+	const choice = await verbs.player.choice(filter, options);
+	if (choice === 'cancel') { return 'loop'; }
+
+	const [row, col] = choice;	
+	verbs.entity.destroy(row, col);
+	await verbs.entity.create(row, col, 'flowerwizard');
+	verbs.entity.destroy(row, col);
+
+	const pts = [
+	    [0, 0],
+	    //[-1, -1],
+	    [-1, 0],
+	    //[-1, 1],
+	    [0, -1],
+	    [0, 1],
+	    //[1, -1],
+	    [1, 0],
+	    //[1, 1],
+	];
+
+	pts
+	    .filter(([r, c]) => !verbs.entity.get(row + r, col + c))
+	    .forEach(([r, c]) => verbs.entity.create(row + r, col + c, 'flower'));
+
+	await verbs.wallet.add(-1);
+
+	return 'pass';
+    },
+    'unplant':  async ctx => {
+	const {verbs} = ctx;
+
+	const filter = mspace(
+	    ([row, col]) => verbs.entity.get(row, col),
+	    (a, b) => Math.max(Math.abs(a[0] - b[0]), Math.abs(a[1] - b[1])),
+	    (a, b) => (a !== b)*1)
+	      .wrt(0, verbs.board.selected()).only(0, d => d <= 2)
+	      .wrt(1, 'flower').only(1, d => d === 0).spread();
+	const options = {cancel: 'cancel'};
+	const choice = await verbs.player.choice(filter, options);
+	if (choice === 'cancel') { return 'loop'; }
+
+	const [row, col] = choice;
+	verbs.entity.destroy(row, col);
+	await verbs.wallet.add(-1);
+
 	return 'pass';
     },
     'shop': async ctx => {
 	const {verbs} = ctx;
 
-	const choice = await verbs.player.act(0, {
+	const filter = mspace(
+	    ([row, col]) => verbs.entity.get(row, col),
+	    (a, b) => Math.max(Math.abs(a[0] - b[0]), Math.abs(a[1] - b[1])),
+	    (a, b) => (a !== b)*1)
+	      .wrt(0, verbs.board.selected()).only(0, d => false)
+	      .wrt(1, null).only(1, d => false).spread();
+	const options = {
+	    plant3: 'plant3',
 	    bombard: 'bombard',
 	    spawn: 'spawn',
+	    // wizard: 'plantwizard',	    
+	    //unplant: 'unplant',
 	    cancel: 'cancel',
-	}, [1, 1, '']);
+	};
+	const prices = [1, 1, 1, ''];
+	const choice = await verbs.player.choice(filter, options, prices);
 
 	if (choice === 'cancel') { return 'loop'; }
 	return choice;

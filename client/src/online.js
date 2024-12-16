@@ -28,7 +28,7 @@ const steps = {
     play: async ctx => {
 	const {engine, width, height, myIdx} = ctx; const {server} = engine;
 
-	const [nrows, ncols] = [7, 7];
+	const [nrows, ncols] = [9, 9];
 	const screen = getScreen({engine, width, height, nrows, ncols});
 
 	const local = {
@@ -56,6 +56,7 @@ const steps = {
 	    entity: {
 		create: async  (row, col, key) => {
 		    if (key === 'flower') { screen.board.replace(row, col, 'grass'); }
+		    if (key === 'flowerwizard') { screen.board.replace(row, col, 'grass'); }
 		    if (key === 'bomb') { screen.board.replace(row, col, 'grass'); }
 		    await screen.entity.create(row, col, key);		
 		},

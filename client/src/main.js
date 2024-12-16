@@ -61,13 +61,18 @@ export const main = async () => {
 	'gnome-blue': 'assets/exported/gnome-blue.png',
 	cancel: 'assets/exported/cancel.png',
 	plant: 'assets/exported/plant.png',
+	plant3: 'assets/exported/plant3.png',
 	shop: 'assets/exported/shop.png',
 	stop: 'assets/exported/stop.png',
 	jump: 'assets/exported/jump.png',
+	kick: 'assets/exported/kick.png',
 	spawn: 'assets/exported/spawn.png',
 	wallet: 'assets/exported/wallet.png',
 	bombard: 'assets/exported/bombard.png',
 	bomb: 'assets/exported/bomb.png',
+	unplant: 'assets/exported/unplant.png',
+	flowerwizard: 'assets/exported/flowerwizard.png',
+	plantwizard: 'assets/exported/plantwizard.png',
     });
     
     const background = engine
