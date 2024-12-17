@@ -306,10 +306,10 @@ const states = {
 
 	return 'pass';
     },
-    'plant3': async ctx => {
+    'plant2': async ctx => {
 	const {verbs} = ctx;
 
-	for (let i = 0; i < 3; i++) {
+	for (let i = 0; i < 2; i++) {
 	    const filter = mspace(
 		([row, col]) => verbs.entity.get(row, col),
 		(a, b) => Math.max(Math.abs(a[0] - b[0]), Math.abs(a[1] - b[1])),
@@ -397,7 +397,7 @@ const states = {
 	      .wrt(0, verbs.board.selected()).only(0, d => false)
 	      .wrt(1, null).only(1, d => false).spread();
 	const options = {
-	    plant3: 'plant3',
+	    plant2: 'plant2',
 	    bombard: 'bombard',
 	    spawn: 'spawn',
 	    // wizard: 'plantwizard',	    

@@ -61,7 +61,7 @@ export const main = async () => {
 	'gnome-blue': 'assets/exported/gnome-blue.png',
 	cancel: 'assets/exported/cancel.png',
 	plant: 'assets/exported/plant.png',
-	plant3: 'assets/exported/plant3.png',
+	plant2: 'assets/exported/plant2.png',
 	shop: 'assets/exported/shop.png',
 	stop: 'assets/exported/stop.png',
 	jump: 'assets/exported/jump.png',
