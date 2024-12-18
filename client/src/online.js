@@ -60,7 +60,13 @@ const steps = {
 		    if (key === 'bomb') { screen.board.replace(row, col, 'grass'); }
 		    await screen.entity.create(row, col, key);		
 		},
-		move: async (p0, p1) => await screen.entity.move(p0, p1),
+		move: async (p0, p1) => {
+		    await screen.entity.move(p0, p1);
+		    if (screen.entity.get(...p1)?.texture.key === 'flower') {
+			screen.board.replace(...p0, 'dirt');
+			screen.board.replace(...p1, 'grass');
+		    }
+		},
 		destroy: async (row, col) => {
 		    screen.board.replace(row, col, 'dirt');
 		    await screen.entity.destroy(row, col);

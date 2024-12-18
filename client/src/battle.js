@@ -124,11 +124,11 @@ const states = {
 	const {verbs} = ctx;
 
 	const filter = mspace(
-	     ([row, col]) => verbs.entity.get(row, col),
-	     (a, b) => Math.max(Math.abs(a[0] - b[0]), Math.abs(a[1] - b[1])),
-	     (a, b) => (a !== b)*1)
-	       .wrt(0, verbs.board.selected()).only(0, d => d === 1)
-	       .wrt(1, null).only(1, d => d === 0).spread();
+	    ([row, col]) => verbs.entity.get(row, col),
+	    (a, b) => Math.max(Math.abs(a[0] - b[0]), Math.abs(a[1] - b[1])),
+	    (a, b) => (a !== b)*1)
+	      .wrt(0, verbs.board.selected()).only(0, d => d === 1)
+	      .wrt(1, null).only(1, d => d === 0).spread();
 	const options = {cancel: 'cancel'};
 	const choice = await verbs.player.choice(filter, options);
 	if (choice === 'cancel') { verbs.board.select(); return 'loop'; }
@@ -142,12 +142,12 @@ const states = {
     act: async ctx => {
 	const {verbs} = ctx;
 
-	 const filter = mspace(
-	     ([row, col]) => verbs.entity.get(row, col),
-	     (a, b) => Math.max(Math.abs(a[0] - b[0]), Math.abs(a[1] - b[1])),
-	     (a, b) => (a !== b)*1)
-	       .wrt(0, verbs.board.selected()).only(0, d => d === 1)
-	       .wrt(1, null).only(1, d => d === 0).spread();
+	const filter = mspace(
+	    ([row, col]) => verbs.entity.get(row, col),
+	    (a, b) => Math.max(Math.abs(a[0] - b[0]), Math.abs(a[1] - b[1])),
+	    (a, b) => (a !== b)*1)
+	      .wrt(0, verbs.board.selected()).only(0, d => d === 1)
+	      .wrt(1, null).only(1, d => d === 0).spread();
 	const options = {plant: 'plant', jump: 'jump', kick: 'kick', shop: 'shop', pass: 'stop'};
 	const choice = await verbs.player.choice(filter, options);
 
@@ -187,7 +187,7 @@ const states = {
 	    (a, b) => Math.max(Math.abs(a[0] - b[0]), Math.abs(a[1] - b[1])),
 	    (a, b) => (a !== b)*1)
 	      .wrt(0, verbs.board.selected()).only(0, d => d === 1)
-	      .wrt(1, 'gnome-red', 'gnome-blue').only(1, d => d === 0).spread();
+	      .wrt(1, 'gnome-red', 'gnome-blue', 'flower').only(1, d => d === 0).spread();
 	const options = {cancel: 'cancel'};
 	const choice = await verbs.player.choice(filter, options);
 	if (choice === 'cancel') { return 'loop'; }
@@ -197,13 +197,53 @@ const states = {
 	const [delta_r, delta_c] = [row - row0, col - col0];
 	const [row1, col1] = [row + delta_r, col + delta_c];
 
-	if (!verbs.entity.get(row1, col1) && verbs.board.contains(row1, col1)) {	    
+	await verbs.entity.move([row0, col0], [row0, col0]);
+	
+	if (!verbs.entity.get(row1, col1) && verbs.board.contains(row1, col1)) {
+	    const flower = verbs.entity.get(row, col) === 'flower';
 	    verbs.entity.move([row, col], [row1, col1]);
-	    verbs.entity.create(row, col, 'flower');
+	    if (!flower) { verbs.entity.create(row, col, 'flower'); };
 	}
 	else {
 	    verbs.entity.move([row, col], [row, col]);
 	}
+
+	return 'pass';
+    },
+    'kick2': async ctx => {
+	const {verbs} = ctx;
+	
+	for (let i = 0; i < 2; i++) {
+	    const filter = mspace(
+		([row, col]) => verbs.entity.get(row, col),
+		(a, b) => Math.max(Math.abs(a[0] - b[0]), Math.abs(a[1] - b[1])),
+		(a, b) => (a !== b)*1)
+		  .wrt(0, verbs.board.selected()).only(0, d => d === 1)
+		  .wrt(1, 'gnome-red', 'gnome-blue', 'flower').only(1, d => d === 0).spread();
+	    const options = i ? {pass: 'stop'} : {cancel: 'cancel'};
+	    const choice = await verbs.player.choice(filter, options);
+	    if (choice === 'cancel') { return 'shop'; }
+	    if (choice === 'pass') { break; }
+
+	    const [row, col] = choice;
+	    const [row0, col0] = verbs.board.selected();
+	    const [delta_r, delta_c] = [row - row0, col - col0];
+	    const [row1, col1] = [row + delta_r, col + delta_c];
+
+	    await verbs.entity.move([row0, col0], [row0, col0]);
+	    
+	    if (!verbs.entity.get(row1, col1) && verbs.board.contains(row1, col1)) {
+		const flower = verbs.entity.get(row, col) === 'flower';
+		verbs.entity.move([row, col], [row1, col1]);
+		if (!flower) { verbs.entity.create(row, col, 'flower'); };
+	    }
+	    else {
+		verbs.entity.move([row, col], [row, col]);
+	    }
+	    
+	}
+
+	await verbs.wallet.add(-1);
 
 	return 'pass';
     },
@@ -278,12 +318,13 @@ const states = {
 	    (a, b) => Math.max(Math.abs(a[0] - b[0]), Math.abs(a[1] - b[1])),
 	    (a, b) => (a !== b)*1)
 	      .wrt(0, verbs.board.selected()).only(0, d => d <= 2)
-	      .wrt(1, null).only(1, d => d === 0).spread();
+	      .wrt(1, null, 'flower').only(1, d => d === 0).spread();
 	const options = {cancel: 'cancel'};
 	const choice = await verbs.player.choice(filter, options);
 	if (choice === 'cancel') { return 'loop'; }
 
 	const [row, col] = choice;
+	verbs.entity.destroy(row, col);
 	await verbs.entity.create(row, col, 'bomb');
 
 	const pts = [
@@ -330,6 +371,36 @@ const states = {
 
 	return 'pass';
     },
+    'shop': async ctx => {
+	const {verbs} = ctx;
+
+	const filter = mspace(
+	    ([row, col]) => verbs.entity.get(row, col),
+	    (a, b) => Math.max(Math.abs(a[0] - b[0]), Math.abs(a[1] - b[1])),
+	    (a, b) => (a !== b)*1)
+	      .wrt(0, verbs.board.selected()).only(0, d => false)
+	      .wrt(1, null).only(1, d => false).spread();
+	const options = {
+	    plant2: 'plant2',
+	    kick2: 'kick2',
+	    bombard: 'bombard',
+	    spawn: 'spawn',
+	    // wizard: 'plantwizard',	    
+	    //unplant: 'unplant',
+	    cancel: 'cancel',
+	};
+	const prices = [1, 1, 1, 1, ''];
+	const choice = await verbs.player.choice(filter, options, prices);
+
+	if (choice === 'cancel') { return 'loop'; }
+	return choice;
+    },
+};
+export const battle = async verbs => {
+    await new Context({external: verbs}).stateMachine(states);
+};
+
+const __TRASH__ = {
     'wizard': async ctx => {
 	const {verbs} = ctx;
 
@@ -387,30 +458,4 @@ const states = {
 
 	return 'pass';
     },
-    'shop': async ctx => {
-	const {verbs} = ctx;
-
-	const filter = mspace(
-	    ([row, col]) => verbs.entity.get(row, col),
-	    (a, b) => Math.max(Math.abs(a[0] - b[0]), Math.abs(a[1] - b[1])),
-	    (a, b) => (a !== b)*1)
-	      .wrt(0, verbs.board.selected()).only(0, d => false)
-	      .wrt(1, null).only(1, d => false).spread();
-	const options = {
-	    plant2: 'plant2',
-	    bombard: 'bombard',
-	    spawn: 'spawn',
-	    // wizard: 'plantwizard',	    
-	    //unplant: 'unplant',
-	    cancel: 'cancel',
-	};
-	const prices = [1, 1, 1, ''];
-	const choice = await verbs.player.choice(filter, options, prices);
-
-	if (choice === 'cancel') { return 'loop'; }
-	return choice;
-    },
-};
-export const battle = async verbs => {
-    await new Context({external: verbs}).stateMachine(states);
 };

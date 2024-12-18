@@ -154,6 +154,7 @@ const steps = {
 		await sprite0?.tween({alpha: 0, scale: 1.3*sprite0.scale});
 		sprite0?.destroy();
 	    },
+	    get: (row, col) => entities[row*ncols + col],
 	};
     },
     options: ctx => {

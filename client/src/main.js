@@ -66,6 +66,7 @@ export const main = async () => {
 	stop: 'assets/exported/stop.png',
 	jump: 'assets/exported/jump.png',
 	kick: 'assets/exported/kick.png',
+	kick2: 'assets/exported/kick2.png',
 	spawn: 'assets/exported/spawn.png',
 	wallet: 'assets/exported/wallet.png',
 	bombard: 'assets/exported/bombard.png',
