@@ -28,7 +28,7 @@ const steps = {
     play: async ctx => {
 	const {engine, width, height, myIdx} = ctx; const {server} = engine;
 
-	const [nrows, ncols] = [9, 9];
+	const [nrows, ncols] = [7, 7];
 	const screen = getScreen({engine, width, height, nrows, ncols});
 
 	const local = {
