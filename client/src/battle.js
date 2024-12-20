@@ -89,21 +89,16 @@ const states = {
 
 	const [row, col] = [Math.floor((nrows-1)/2), Math.floor((ncols-1)/2)];
 	await verbs.board.create();
-
-	//verbs.entity.create(1, 1, 'flower');
-	//verbs.entity.create(nrows-2, 1, 'flower');
-	//verbs.entity.create(1, ncols-2, 'flower');
-	//await verbs.entity.create(nrows-2, ncols-2, 'flower');
-	//verbs.entity.create(row, col, 'flower');
-	
-	// verbs.entity.create(row-1, col-1, 'gnome-red');
-	// verbs.entity.create(row+1, col-1, 'gnome-red');
-	// verbs.entity.create(row-1, col+1, 'gnome-blue');
-	// await verbs.entity.create(row+1, col+1, 'gnome-blue');
-
-	verbs.entity.create(row, col-2, 'gnome-red');
 	verbs.entity.create(row, col, 'mushroom');
-	await verbs.entity.create(row, col+2, 'gnome-blue');
+	
+	
+	verbs.entity.create(row-2, col-2, 'gnome-red');
+	verbs.entity.create(row+2, col-2, 'gnome-red');
+	verbs.entity.create(row-2, col+2, 'gnome-blue');
+	await verbs.entity.create(row+2, col+2, 'gnome-blue');
+
+	//verbs.entity.create(row, col-2, 'gnome-red');	
+	//await verbs.entity.create(row, col+2, 'gnome-blue');
 
 	await verbs.wallet.create();
 
